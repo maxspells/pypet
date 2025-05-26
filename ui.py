@@ -101,7 +101,7 @@ class WorldItemPanel:
         for i in self.items:
             surface.blit(i.image, i.rect)
 
-    def handle_event(self, event, width, height):
+    def handle_event(self, event, width, height, trash_panel):
         if event.type == pygame.MOUSEBUTTONDOWN:
             for thing in reversed(self.items):  # Topmost first
                 if thing.rect.collidepoint(event.pos):
@@ -117,13 +117,33 @@ class WorldItemPanel:
             self.dragging_item.rect.x = mouse_x + self.drag_offset[0]
             self.dragging_item.rect.y = mouse_y + self.drag_offset[1]
 
+            # Clamp to window bounds
+            if self.dragging_item.rect.left < 0:
+                self.dragging_item.rect.left = 0
+            if self.dragging_item.rect.right > width:
+                self.dragging_item.rect.right = width
+            if self.dragging_item.rect.top < 0:
+                self.dragging_item.rect.top = 0
+            if self.dragging_item.rect.bottom > height:
+                self.dragging_item.rect.bottom = height
+
         elif event.type == pygame.MOUSEBUTTONUP and self.dragging_item:
-            # Remove if out of bounds
-            if (
-                self.dragging_item.rect.right < 0
-                or self.dragging_item.rect.left > width
-                or self.dragging_item.rect.bottom < 0
-                or self.dragging_item.rect.top > height
-            ):
+            if trash_panel.is_over(self.dragging_item):
                 self.remove_item(self.dragging_item)
             self.dragging_item = None
+
+
+class TrashPanel:
+    def __init__(self, x, y, width, height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.color = (180, 60, 60)  # Reddish
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, self.color, self.rect, border_radius=8)
+        font = pygame.font.SysFont(None, 24)
+        text_surf = font.render("Trash", True, (255, 255, 255))
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        surface.blit(text_surf, text_rect)
+
+    def is_over(self, item):
+        return self.rect.colliderect(item.rect)
