@@ -49,6 +49,7 @@ while running:
         if event.type == pygame.QUIT:
             saveload.save_data(thepet)
             running = False
+        thepet.handle_event(event, WIDTH, HEIGHT)
         item_button.handle_event(event)
         menu_button.handle_event(event)
         item_panel.handle_event(event, thepet)
@@ -57,8 +58,6 @@ while running:
     screen.fill(BG_COLOR)
 
     # Draw
-    dog_rect = thepet.sprite.get_rect(topleft=(160, 150))
-    thepet.rect.center = pet_pos
     thepet.draw(screen)
 
     item_panel.draw(screen)
