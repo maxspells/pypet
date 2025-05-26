@@ -1,0 +1,9 @@
+# Ignore the save file
+data.max
+
+# Ignore Python cache directories
+__pycache__/
+*.pyc
+
+# Ignore flake8 config file
+.flake8
