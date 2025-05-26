@@ -65,5 +65,7 @@ class Poop(Item):
     def __init__(self, x=0, y=0):
         super().__init__(x, y, name="Poop", cost=0, itemType="Poop")
         self.description = "A stinky pile left by your pet."
-        self.image = pygame.image.load("assets/poop.png").convert_alpha()
+        image = pygame.image.load("assets/poop.png").convert_alpha()
+        w, h = image.get_size()
+        self.image = pygame.transform.scale(image, (w * 2, h * 2))
         self.rect = self.image.get_rect(topleft=(x, y))
