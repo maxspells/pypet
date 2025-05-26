@@ -1,5 +1,6 @@
 import pygame
 import os
+import item
 import math
 import random
 
@@ -26,6 +27,7 @@ class pet:
         self.wander_speed = 80  # pixels per second
         self.dragging = False
         self.drag_offset = (0, 0)
+        self.poop_timer = 0  # Time since last poop
 
     def hatch(self):
         if self.age_stage == "egg":
@@ -47,10 +49,14 @@ class pet:
         y = random.randint(margin + sprite_h // 2, screen_height - margin - sprite_h // 2)
         self.wander_target = (x, y)
 
-    def update(self, seconds_passed):
-        self.age += seconds_passed  # Increment age
+    def poop(self, world_items=None):
+        """Create a poop item at the pet's current position."""
+        if world_items is not None:
+            poop = item.Poop(self.rect.centerx, self.rect.bottom)
+            world_items.add_item(poop)
+        self.poop_timer = 0
 
-        # Prevent wandering or idling logic if in egg state
+    def update(self, seconds_passed, world_items=None):
         if self.age_stage == "egg":
             # Handle hatching state
             if hasattr(self, "_hatching") and self._hatching:
@@ -61,12 +67,21 @@ class pet:
                 return
 
             # --- Egg hatching logic ---
+            self.age += seconds_passed
             if self.age >= 180:
                 max_age = 360  # 6 minutes
                 chance = min(1.0, (self.age - 180) / (max_age - 180))
                 if random.random() < chance:
                     self.hatch()
-            return  # Skip hunger/energy updates and all other logic for eggs
+            return  # Skip all other logic for eggs
+
+        # Now handle poop and everything else for non-eggs
+        self.age += seconds_passed
+        self.poop_timer += seconds_passed
+
+        # Poop every 30 seconds
+        if self.poop_timer >= 30:
+            self.poop(world_items)
 
         # Idle logic
         if self.state == "idle":

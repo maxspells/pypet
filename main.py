@@ -1,7 +1,7 @@
 import pygame
 import sys
 import pet
-from ui import ItemPanel, Button
+from ui import ItemPanel, Button, WorldItemPanel
 import saveload
 
 # Initialize pygame
@@ -20,6 +20,7 @@ pygame.display.set_caption("PyPet")
 
 # UI stuffs
 item_panel = ItemPanel(WIDTH - 100, 50, 80, 300)
+world_items = WorldItemPanel()
 
 
 def toggle_item_panel():
@@ -53,11 +54,13 @@ while running:
         item_button.handle_event(event)
         menu_button.handle_event(event)
         item_panel.handle_event(event, thepet)
+        world_items.handle_event(event, WIDTH, HEIGHT)
 
     # Clear screen
     screen.fill(BG_COLOR)
 
     # Draw
+    world_items.draw(screen)
     thepet.draw(screen)
 
     item_panel.draw(screen)
@@ -73,7 +76,7 @@ while running:
     screen.blit(age_text, age_rect)
 
     seconds = clock.get_time() / 1000  # time in seconds since last frame
-    thepet.update(seconds)
+    thepet.update(seconds, world_items)
 
     item_button.draw(screen)
     menu_button.draw(screen)

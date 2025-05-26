@@ -59,3 +59,11 @@ class PetFood(Food):
         )
         self.image = pygame.image.load("assets/FruitAssets/fruit1.png").convert_alpha()
         self.rect = self.image.get_rect(topleft=(x, y))
+
+
+class Poop(Item):
+    def __init__(self, x=0, y=0):
+        super().__init__(x, y, name="Poop", cost=0, itemType="Poop")
+        self.description = "A stinky pile left by your pet."
+        self.image = pygame.image.load("assets/poop.png").convert_alpha()
+        self.rect = self.image.get_rect(topleft=(x, y))

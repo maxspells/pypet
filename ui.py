@@ -77,9 +77,53 @@ class ItemPanel:
             if dog.rect.colliderect(self.dragging_item.rect):
                 # Feed the dog
                 self.dragging_item.use(dog)
-                # Option 1: Remove item after use (if consumable)
-                self.items.remove(self.dragging_item)
+                self.dragging_item.rect.topleft = self.dragging_item.orig_pos
             else:
                 # Return item to original place (you'll want to store this on item)
                 self.dragging_item.rect.topleft = self.dragging_item.orig_pos
+            self.dragging_item = None
+
+
+class WorldItemPanel:
+    def __init__(self):
+        self.items = []
+        self.dragging_item = None
+        self.drag_offset = (0, 0)
+
+    def add_item(self, item):
+        self.items.append(item)
+
+    def remove_item(self, item):
+        if item in self.items:
+            self.items.remove(item)
+
+    def draw(self, surface):
+        for i in self.items:
+            surface.blit(i.image, i.rect)
+
+    def handle_event(self, event, width, height):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            for thing in reversed(self.items):  # Topmost first
+                if thing.rect.collidepoint(event.pos):
+                    self.dragging_item = thing
+                    mouse_x, mouse_y = event.pos
+                    offset_x = thing.rect.x - mouse_x
+                    offset_y = thing.rect.y - mouse_y
+                    self.drag_offset = (offset_x, offset_y)
+                    break
+
+        elif event.type == pygame.MOUSEMOTION and self.dragging_item:
+            mouse_x, mouse_y = event.pos
+            self.dragging_item.rect.x = mouse_x + self.drag_offset[0]
+            self.dragging_item.rect.y = mouse_y + self.drag_offset[1]
+
+        elif event.type == pygame.MOUSEBUTTONUP and self.dragging_item:
+            # Remove if out of bounds
+            if (
+                self.dragging_item.rect.right < 0
+                or self.dragging_item.rect.left > width
+                or self.dragging_item.rect.bottom < 0
+                or self.dragging_item.rect.top > height
+            ):
+                self.remove_item(self.dragging_item)
             self.dragging_item = None

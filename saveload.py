@@ -12,10 +12,11 @@ def save_data(petclass):
         data.write(str(petclass.state) + "\n")
         data.write(str(petclass.age_stage) + "\n")
         data.write(str(petclass.age) + "\n")
-        data.write(str(petclass.idle_time) + "\n")         # Save idle_time
-        data.write(str(petclass.next_wander_time) + "\n")  # Save next_wander_time
-        data.write(str(petclass.rect.centerx) + "\n")      # Save X position
-        data.write(str(petclass.rect.centery) + "\n")      # Save Y position
+        data.write(str(petclass.idle_time) + "\n")
+        data.write(str(petclass.next_wander_time) + "\n")
+        data.write(str(petclass.rect.centerx) + "\n")
+        data.write(str(petclass.rect.centery) + "\n")
+        data.write(str(petclass.poop_timer) + "\n")
 
 
 def load_data(petclass):
@@ -33,6 +34,7 @@ def load_data(petclass):
             next_wander_time = float(lines[8].strip()) if len(lines) > 8 else 0
             centerx = int(lines[9].strip()) if len(lines) > 9 else 400
             centery = int(lines[10].strip()) if len(lines) > 10 else 300
+            poop_timer = float(lines[11].strip()) if len(lines) > 11 else 0
 
             pet = type(petclass)(name, age_stage=age_stage)
             pet.energy = energy
@@ -44,6 +46,7 @@ def load_data(petclass):
             pet.idle_time = idle_time
             pet.next_wander_time = next_wander_time
             pet.rect.center = (centerx, centery)
+            pet.poop_timer = poop_timer
             return pet
     else:
         return None
