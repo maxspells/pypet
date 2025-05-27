@@ -6,6 +6,14 @@ import random
 
 
 class pet:
+    AGE_STAGES = [
+        ("egg", 0),
+        ("baby", 0),         # 0+ seconds (after hatching)
+        ("teen", 3600),      # 1 hour
+        ("adult", 7200),     # 2 hours
+        ("dead", float("inf"))
+    ]
+
     def __init__(self, name, sprite=None, age_stage="egg"):
         if age_stage == "egg":
             sprite = pygame.image.load("assets/eggs/01.png").convert_alpha()
@@ -28,6 +36,8 @@ class pet:
         self.dragging = False
         self.drag_offset = (0, 0)
         self.poop_timer = 0  # Time since last poop
+        self.hasEaten = False  # Flag to track if the pet has eaten
+        self.can_fetch = False  # Whether the pet can fetch items
 
     def hatch(self):
         if self.age_stage == "egg":
@@ -36,6 +46,15 @@ class pet:
             self._hatch_channel = self._hatch_sound.play()
             self.age = 0  # Reset age when hatching
             self._hatching = True  # Set a flag to indicate hatching is in progress
+
+    # Update age stage based on age
+    def update_age_stage(self):
+        for stage, threshold in reversed(self.AGE_STAGES):
+            if self.age >= threshold:
+                if self.age_stage != stage:
+                    self.age_stage = stage
+                    self.set_sprite_for_stage()
+            break
 
     def play(self):
         if self.energy > 10:
@@ -54,7 +73,6 @@ class pet:
         if world_items is not None:
             poop = item.Poop(self.rect.centerx, self.rect.bottom)
             world_items.add_item(poop)
-        self.poop_timer = 0
 
     def update(self, seconds_passed, world_items=None):
         if self.age_stage == "egg":
@@ -68,6 +86,8 @@ class pet:
 
             # --- Egg hatching logic ---
             self.age += seconds_passed
+            self.age += seconds_passed
+            self.update_age_stage()
             if self.age >= 180:
                 max_age = 360  # 6 minutes
                 chance = min(1.0, (self.age - 180) / (max_age - 180))
@@ -75,13 +95,49 @@ class pet:
                     self.hatch()
             return  # Skip all other logic for eggs
 
-        # Now handle poop and everything else for non-eggs
         self.age += seconds_passed
         self.poop_timer += seconds_passed
 
         # Poop every 30 seconds
-        if self.poop_timer >= 30:
+        if self.poop_timer >= 30 and self.hasEaten:
             self.poop(world_items)
+            self.hasEaten = False
+
+        # --- Toy seeking behavior ---
+        if self.state == "idle" and world_items is not None:
+            # Look for toys in the world
+            for thing in world_items.items:
+                if hasattr(thing, "itemType") and thing.itemType == "Toy":
+                    # Go to the first toy found
+                    self.state = "seek_toy"
+                    self.target_toy = thing
+                    break
+
+        # Toy seeking state
+        if getattr(self, "state", None) == "seek_toy" and hasattr(self, "target_toy"):
+            toy = self.target_toy
+            # Move toward the toy
+            x, y = self.rect.center
+            tx, ty = toy.rect.center
+            dx, dy = tx - x, ty - y
+            dist = math.hypot(dx, dy)
+            if dist < 10:
+                # Reached the toy, use it
+                prev_state = self.state
+                toy.use(self)
+                # Only return to idle if we didn't start fetching
+                if self.state == prev_state:
+                    self.state = "idle"
+                if hasattr(self, "target_toy"):
+                    del self.target_toy
+            else:
+                step = self.wander_speed * seconds_passed
+                if step > dist:
+                    step = dist
+                nx = x + dx / dist * step
+                ny = y + dy / dist * step
+                self.rect.center = (int(nx), int(ny))
+            return  # Skip other movement logic while seeking toy
 
         # Idle logic
         if self.state == "idle":
@@ -146,6 +202,84 @@ class pet:
                 self.set_sprite_for_stage()
                 self._hatching = False  # Reset flag
             return  # Skip the rest of update while hatching
+
+        if getattr(self, "state", None) == "fetch":
+            missing = (
+                not hasattr(self, "fetch_item") or
+                not hasattr(self, "fetch_dest") or
+                world_items is None or
+                not hasattr(world_items, "items") or
+                not any(getattr(i, "item_id", None) == getattr(self.fetch_item, "item_id", None) for i in world_items.items)
+            )
+            if missing:
+                print("Fetch failsafe triggered: resetting to idle")
+                self.state = "idle"
+                if hasattr(self, "fetch_item"):
+                    del self.fetch_item
+                if hasattr(self, "fetch_dest"):
+                    del self.fetch_dest
+                if hasattr(self, "carrying_item"):
+                    del self.carrying_item
+                return
+
+            # Update fetch_item reference to the actual object in world_items
+            for i in world_items.items:
+                if getattr(i, "item_id", None) == getattr(self.fetch_item, "item_id", None):
+                    self.fetch_item = i
+                    break
+
+            # --- Fetch logic ---
+            if not getattr(self, "carrying_item", False):
+                # Move toward the item to fetch
+                x, y = self.rect.center
+                tx, ty = self.fetch_item.rect.center
+                dx, dy = tx - x, ty - y
+                dist = math.hypot(dx, dy)
+                if dist < 10:
+                    # Pick up the item
+                    self.carrying_item = True
+                else:
+                    step = self.wander_speed * seconds_passed
+                    if step > dist:
+                        step = dist
+                    nx = x + dx / dist * step
+                    ny = y + dy / dist * step
+                    self.rect.center = (int(nx), int(ny))
+                return
+            else:
+                # Move toward the fetch destination with the item
+                x, y = self.rect.center
+                tx, ty = self.fetch_dest
+                dx, dy = tx - x, ty - y
+                dist = math.hypot(dx, dy)
+                if dist < 10:
+                    # Drop the item at the destination
+                    self.fetch_item.rect.center = (int(tx), int(ty))
+                    self.fetch_item.fetched = True  # Mark as fetched
+                    self.carrying_item = False
+                    
+                    # Stay in fetch state until item is picked up
+                    return
+                else:
+                    step = self.wander_speed * seconds_passed
+                    if step > dist:
+                        step = dist
+                    nx = x + dx / dist * step
+                    ny = y + dy / dist * step
+                    self.rect.center = (int(nx), int(ny))
+                    # Carry the item with the pet
+                    self.fetch_item.rect.center = self.rect.center
+                return
+
+            # After dropping, check if the item is still in the world
+            if hasattr(self, "fetch_item") and getattr(self.fetch_item, "fetched", False):
+                # If the item is no longer in the world (picked up), return to idle
+                if not any(i is self.fetch_item for i in world_items.items):
+                    self.state = "idle"
+                    del self.fetch_item
+                    del self.fetch_dest
+                    if hasattr(self, "carrying_item"):
+                        del self.carrying_item
 
     def draw(self, surface):
         original_x = self.rect.x
@@ -235,6 +369,40 @@ class dog(pet):
         self.rect = self.sprite.get_rect(center=(x, y))
         sound_path = os.path.join("sounds", "dog.mp3")
         self.sound = pygame.mixer.Sound(sound_path)
+        self.can_fetch = True  # Dogs can fetch items
 
     def bark(self):
         self.sound.play()
+
+    def fetch(self, item_to_fetch, fetch_dest):
+        """Start fetch behavior: go to item, then carry it to fetch_dest (x, y)."""
+        # Only fetch if the item is in the world
+        world_items = None
+        if hasattr(self, "world_items_ref"):
+            world_items = self.world_items_ref
+        if world_items and hasattr(world_items, "items"):
+            if item_to_fetch not in world_items.items:
+                print("Fetch aborted: item not in world_items")
+                return
+        self.state = "fetch"
+        self.fetch_item = item_to_fetch
+        self.fetch_dest = fetch_dest
+        self.carrying_item = False
+        self.happiness = min(self.happiness + 10, 100)
+
+    def relink_fetch_item(self, world_items):
+        if hasattr(self, "fetch_item") and world_items and hasattr(world_items, "items"):
+            for thing in world_items.items:
+                if getattr(thing, "item_id", None) == getattr(self.fetch_item, "item_id", None):
+                    self.fetch_item = thing
+                    return
+            # If not found, clear fetch state
+            self.state = "idle"
+            if hasattr(self, "fetch_item"):
+                del self.fetch_item
+            if hasattr(self, "fetch_dest"):
+                del self.fetch_dest
+            if hasattr(self, "carrying_item"):
+                del self.carrying_item
+
+

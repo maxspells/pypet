@@ -37,7 +37,12 @@ class ItemPanel:
         # Create PetFood item 2
         pet_food_2 = item.PetFood(x + 10, y + 70)
         pet_food_2.orig_pos = (x + 10, y + 70)
-        self.items = [pet_food_1, pet_food_2]
+
+        # Create Ball item
+        ball_1 = item.Ball(x + 10, y + 130)
+        ball_1.orig_pos = (x + 10, y + 130)
+
+        self.items = [pet_food_1, pet_food_2, ball_1]
         self.dragging_item = None
         self.drag_offset = (0, 0)
 
@@ -53,7 +58,7 @@ class ItemPanel:
         for i in self.items:
             surface.blit(i.image, i.rect)
 
-    def handle_event(self, event, dog):
+    def handle_event(self, event, pet, world_items=None, WIDTH=450, HEIGHT=450):
         if event.type == pygame.MOUSEBUTTONDOWN:
             for thing in self.items:
                 if thing.rect.collidepoint(event.pos):
@@ -69,17 +74,34 @@ class ItemPanel:
             self.dragging_item.rect.x = mouse_x + self.drag_offset[0]
             self.dragging_item.rect.y = mouse_y + self.drag_offset[1]
 
+            # Clamp to game window bounds
+            if self.dragging_item.rect.left < 0:
+                self.dragging_item.rect.left = 0
+            if self.dragging_item.rect.right > WIDTH:
+                self.dragging_item.rect.right = WIDTH
+            if self.dragging_item.rect.top < 0:
+                self.dragging_item.rect.top = 0
+            if self.dragging_item.rect.bottom > HEIGHT:
+                self.dragging_item.rect.bottom = HEIGHT
+
         elif event.type == pygame.MOUSEBUTTONUP and self.dragging_item:
-            mouse_pos = event.pos
-            print(f"Dropping item at {mouse_pos}")
-            print(f"Dog rect: {dog.rect}")
-            print(f"Collision? {dog.rect.collidepoint(mouse_pos)}")
-            if dog.rect.colliderect(self.dragging_item.rect):
-                # Feed the dog
-                self.dragging_item.use(dog)
+            item_type = getattr(self.dragging_item, "itemType", None)
+            # Dropped on pet: feed if food
+            if item_type == "Food" and pet.rect.colliderect(self.dragging_item.rect):
+                self.dragging_item.use(pet)
+                # Snap back to original position (do NOT remove from panel)
+                self.dragging_item.rect.topleft = self.dragging_item.orig_pos
+            # Dropped outside the panel: add toy to world
+            elif item_type == "Toy" and not self.rect.colliderect(self.dragging_item.rect) and world_items is not None:
+                # Create a new toy of the same type at the drop location
+                toy_class = type(self.dragging_item)
+                drop_x, drop_y = self.dragging_item.rect.topleft
+                new_toy = toy_class(drop_x, drop_y)
+                world_items.add_item(new_toy)
+                # Snap the original back to its slot
                 self.dragging_item.rect.topleft = self.dragging_item.orig_pos
             else:
-                # Return item to original place (you'll want to store this on item)
+                # Snap back to original position
                 self.dragging_item.rect.topleft = self.dragging_item.orig_pos
             self.dragging_item = None
 
@@ -101,12 +123,17 @@ class WorldItemPanel:
         for i in self.items:
             surface.blit(i.image, i.rect)
 
-    def handle_event(self, event, width, height, trash_panel):
+    def handle_event(self, event, WIDTH, HEIGHT, trash_panel=None):
         if event.type == pygame.MOUSEBUTTONDOWN:
-            for thing in reversed(self.items):  # Topmost first
+            for thing in self.items[:]:  # Copy to allow removal
                 if thing.rect.collidepoint(event.pos):
-                    self.dragging_item = thing
+                    # If the item was fetched and dropped off, remove it immediately
+                    if getattr(thing, "fetched", False):
+                        self.items.remove(thing)
+                        return
+                    # If the item was clicked, start dragging it
                     mouse_x, mouse_y = event.pos
+                    self.dragging_item = thing
                     offset_x = thing.rect.x - mouse_x
                     offset_y = thing.rect.y - mouse_y
                     self.drag_offset = (offset_x, offset_y)
@@ -117,15 +144,15 @@ class WorldItemPanel:
             self.dragging_item.rect.x = mouse_x + self.drag_offset[0]
             self.dragging_item.rect.y = mouse_y + self.drag_offset[1]
 
-            # Clamp to window bounds
+            # Clamp to game window bounds
             if self.dragging_item.rect.left < 0:
                 self.dragging_item.rect.left = 0
-            if self.dragging_item.rect.right > width:
-                self.dragging_item.rect.right = width
+            if self.dragging_item.rect.right > WIDTH:
+                self.dragging_item.rect.right = WIDTH
             if self.dragging_item.rect.top < 0:
                 self.dragging_item.rect.top = 0
-            if self.dragging_item.rect.bottom > height:
-                self.dragging_item.rect.bottom = height
+            if self.dragging_item.rect.bottom > HEIGHT:
+                self.dragging_item.rect.bottom = HEIGHT
 
         elif event.type == pygame.MOUSEBUTTONUP and self.dragging_item:
             if trash_panel.is_over(self.dragging_item):

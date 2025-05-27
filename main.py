@@ -43,6 +43,8 @@ pet_radius = 40
 thepet = saveload.load_data(pet.dog("Theo"), world_items)
 if thepet is None:
     thepet = pet.dog("Theo", x=pet_pos[0], y=pet_pos[1])
+else:
+    thepet.relink_fetch_item(world_items)
 
 # Main loop
 running = True
@@ -54,7 +56,7 @@ while running:
         thepet.handle_event(event, WIDTH, HEIGHT)
         item_button.handle_event(event)
         menu_button.handle_event(event)
-        item_panel.handle_event(event, thepet)
+        item_panel.handle_event(event, thepet, world_items, WIDTH, HEIGHT)
         world_items.handle_event(event, WIDTH, HEIGHT, trash_panel)
 
     # Clear screen

@@ -2,13 +2,17 @@ import pygame
 
 
 class Item:
-    def __init__(self, x, y, name=None, cost=0, itemType=None):
+    _next_id = 1
+
+    def __init__(self, x=0, y=0, name=None, cost=0, itemType=None):
+        self.rect = pygame.Rect(x, y, 32, 32)
         self.name = name
         self.cost = cost
         self.itemType = itemType
+        self.item_id = Item._next_id
+        Item._next_id += 1
 
         self.image = None
-        self.rect = None
         self.dragging = False
         self.offset_x = 0
         self.offset_y = 0
@@ -37,23 +41,21 @@ class Item:
 
 
 class Food(Item):
-    def __init__(self, name=None, cost=0, calories=None):
-        super().__init__(
-            name,
-            cost,
-        )
-        self.itemType = "Food"
+    def __init__(self, x=0, y=0, name=None, cost=0, calories=None):
+        super().__init__(x, y, name=name, cost=cost, itemType="Food")
         self.calories = calories
 
     def use(self, pet):
         pet.hunger = max(pet.hunger - self.calories, 0)
         if hasattr(pet, "bark"):
             pet.bark()
+        pet.poop_timer = 0  # Reset poop timer after feeding
+        pet.hasEaten = True
 
 
 class PetFood(Food):
     def __init__(self, x=0, y=0):
-        super().__init__(name="Pet Food", cost=0, calories=10)
+        super().__init__(x, y, name="Pet Food", cost=0, calories=10)
         self.description = (
             "Some bland pet food. Doesn't taste very good, but it's there."
         )
@@ -69,3 +71,41 @@ class Poop(Item):
         w, h = image.get_size()
         self.image = pygame.transform.scale(image, (w * 2, h * 2))
         self.rect = self.image.get_rect(topleft=(x, y))
+
+
+class Toy(Item):
+    def __init__(self, x=0, y=0, name="Toy", cost=5):
+        super().__init__(x, y, name=name, cost=cost, itemType="Toy")
+        self.description = "A generic toy for your pet to play with."
+        # Placeholder image, replace with your toy asset later
+        self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
+        self.image.fill((200, 200, 50, 255))  # Yellowish color
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+    def use(self, pet):
+        # Toys might increase happiness or trigger play in the future
+        pass
+
+
+class Ball(Toy):
+    def __init__(self, x=0, y=0):
+        super().__init__(x, y, name="Ball", cost=10)
+        self.description = "A bouncy ball for your pet to chase!"
+        # Draw a simple ball as a placeholder (replace with image if you have one)
+        size = 32
+        self.image = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.circle(self.image, (255, 80, 80), (size // 2, size // 2), size // 2)
+        pygame.draw.circle(self.image, (255, 255, 255), (size // 2 + 6, size // 2 - 6), 6)
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+    def use(self, pet):
+        # If the pet can fetch, trigger fetch behavior
+        if hasattr(pet, "can_fetch") and pet.can_fetch:
+            # Fetch to current mouse position
+            import pygame
+            fetch_dest = pygame.mouse.get_pos()
+            pet.fetch(self, fetch_dest)
+        else:
+            # Otherwise, just play with the ball (increase happiness, etc.)
+            if hasattr(pet, "happiness"):
+                pet.happiness = min(pet.happiness + 10, 100)
